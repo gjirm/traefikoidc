@@ -98,7 +98,7 @@ func (t *TraefikOidc) getNewTokenWithRefreshToken(refreshToken string) (*TokenRe
 }
 
 func (t *TraefikOidc) handleLogout(rw http.ResponseWriter, req *http.Request) {
-	session, err := t.store.Get(req, cookieName)
+	session, err := t.store.Get(req, t.cookieName)
 	t.logger.Debugf("Logging out user")
 	if err != nil {
 		handleError(rw, "Session error", http.StatusInternalServerError, t.logger)
@@ -133,7 +133,7 @@ func (t *TraefikOidc) handleExpiredToken(rw http.ResponseWriter, req *http.Reque
 }
 
 func (t *TraefikOidc) handleCallback(rw http.ResponseWriter, req *http.Request) (bool, string) {
-	session, err := t.store.Get(req, cookieName)
+	session, err := t.store.Get(req, t.cookieName)
 	if err != nil {
 		handleError(rw, "Session error", http.StatusInternalServerError, t.logger)
 		return false, ""

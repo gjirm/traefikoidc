@@ -20,7 +20,7 @@ func BenchmarkServeHTTP_AuthenticatedUser(b *testing.B) {
 	suite.SetupTest()
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
-	session := sessions.NewSession(suite.mockStore, cookieName)
+	session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 	session.Values["authenticated"] = true
 
 	claims := map[string]interface{}{
@@ -31,7 +31,7 @@ func BenchmarkServeHTTP_AuthenticatedUser(b *testing.B) {
 	mockToken := fmt.Sprintf("header.%s.signature", encodedClaims)
 	session.Values["id_token"] = mockToken
 
-	suite.mockStore.On("Get", req, cookieName).Return(session, nil)
+	suite.mockStore.On("Get", req, suite.oidc.cookieName).Return(session, nil)
 	suite.mockStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	suite.mockTokenVerifier.On("VerifyToken", mockToken).Return(nil)
 
@@ -165,7 +165,7 @@ func BenchmarkDetermineHost(b *testing.B) {
 func BenchmarkIsUserAuthenticated(b *testing.B) {
 	suite := new(TraefikOidcTestSuite)
 	suite.SetupTest()
-	session := sessions.NewSession(suite.mockStore, cookieName)
+	session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 	session.Values["authenticated"] = true
 	session.Values["id_token"] = "valid.eyJleHAiOjk5OTk5OTk5OTl9.signature"
 

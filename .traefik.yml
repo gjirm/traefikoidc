@@ -20,3 +20,5 @@ testData:
   forceHTTPS: false
   logLevel: debug
   rateLimit: 100
+  sessionTimeout: 86400
+  cookieName: _raczylo_oidc

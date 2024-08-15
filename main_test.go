@@ -116,6 +116,8 @@ func (suite *TraefikOidcTestSuite) SetupTest() {
 		jwksURL:        "https://example.com/.well-known/jwks.json",
 		tokenVerifier:  suite.mockTokenVerifier,
 		jwtVerifier:    suite.mockJWTVerifier,
+		sessionTimeout: config.SessionTimeout,
+		cookieName:     config.CookieName,
 	}
 }
 
@@ -123,7 +125,7 @@ func (suite *TraefikOidcTestSuite) TestServeHTTP_AuthenticatedUser() {
 	req := httptest.NewRequest("GET", "http://example.com", nil)
 	rw := httptest.NewRecorder()
 
-	session := sessions.NewSession(suite.mockStore, cookieName)
+	session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 	session.Values["authenticated"] = true
 
 	claims := map[string]interface{}{
@@ -134,7 +136,7 @@ func (suite *TraefikOidcTestSuite) TestServeHTTP_AuthenticatedUser() {
 	mockToken := fmt.Sprintf("header.%s.signature", encodedClaims)
 	session.Values["id_token"] = mockToken
 
-	suite.mockStore.On("Get", req, cookieName).Return(session, nil)
+	suite.mockStore.On("Get", req, suite.oidc.cookieName).Return(session, nil)
 	suite.mockStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	suite.mockTokenVerifier.On("VerifyToken", mockToken).Return(nil)
@@ -156,11 +158,11 @@ func (suite *TraefikOidcTestSuite) TestServeHTTP_CallbackPath() {
 	req := httptest.NewRequest("GET", "http://example.com"+suite.oidc.redirURLPath+"?code=test_code&state=test_state", nil)
 	rw := httptest.NewRecorder()
 
-	session := sessions.NewSession(suite.mockStore, cookieName)
+	session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 	session.Values["csrf"] = "test_state"
 	session.Values["incoming_path"] = "/original_path"
 
-	suite.mockStore.On("Get", req, cookieName).Return(session, nil)
+	suite.mockStore.On("Get", req, suite.oidc.cookieName).Return(session, nil)
 	suite.mockStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	claims := map[string]interface{}{
@@ -335,10 +337,10 @@ func (suite *TraefikOidcTestSuite) TestHandleLogout() {
 	req := httptest.NewRequest("GET", "http://example.com/logout", nil)
 	rw := httptest.NewRecorder()
 
-	session := sessions.NewSession(suite.mockStore, cookieName)
+	session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 	session.Values["id_token"] = "test_token"
 
-	suite.mockStore.On("Get", req, cookieName).Return(session, nil)
+	suite.mockStore.On("Get", req, suite.oidc.cookieName).Return(session, nil)
 	suite.mockStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	suite.oidc.handleLogout(rw, req)
@@ -415,7 +417,7 @@ func (suite *TraefikOidcTestSuite) TestIsUserAuthenticated() {
 		{
 			name: "Valid Token",
 			setupSession: func() *sessions.Session {
-				session := sessions.NewSession(suite.mockStore, cookieName)
+				session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 				session.Values["authenticated"] = true
 				session.Values["id_token"] = "valid.eyJleHAiOjk5OTk5OTk5OTl9.signature"
 				return session
@@ -427,7 +429,7 @@ func (suite *TraefikOidcTestSuite) TestIsUserAuthenticated() {
 		{
 			name: "Expired Token",
 			setupSession: func() *sessions.Session {
-				session := sessions.NewSession(suite.mockStore, cookieName)
+				session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 				session.Values["authenticated"] = true
 				session.Values["id_token"] = "expired.eyJleHAiOjE1OTM1NjE2MDB9.signature"
 				return session
@@ -439,7 +441,7 @@ func (suite *TraefikOidcTestSuite) TestIsUserAuthenticated() {
 		{
 			name: "Token Needs Refresh",
 			setupSession: func() *sessions.Session {
-				session := sessions.NewSession(suite.mockStore, cookieName)
+				session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 				session.Values["authenticated"] = true
 				// Set expiration to 4 minutes from now
 				exp := time.Now().Add(4 * time.Minute).Unix()
@@ -454,7 +456,7 @@ func (suite *TraefikOidcTestSuite) TestIsUserAuthenticated() {
 		{
 			name: "Not Authenticated",
 			setupSession: func() *sessions.Session {
-				session := sessions.NewSession(suite.mockStore, cookieName)
+				session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 				session.Values["authenticated"] = false
 				return session
 			},
@@ -479,7 +481,7 @@ func (suite *TraefikOidcTestSuite) TestIsUserAuthenticated() {
 func (suite *TraefikOidcTestSuite) TestInitiateAuthentication() {
 	req := httptest.NewRequest("GET", "http://example.com", nil)
 	rw := httptest.NewRecorder()
-	session := sessions.NewSession(suite.mockStore, cookieName)
+	session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 
 	suite.mockStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
@@ -504,7 +506,7 @@ func (suite *TraefikOidcTestSuite) TestServeHTTP_InvalidSession() {
 	req := httptest.NewRequest("GET", "http://example.com", nil)
 	rw := httptest.NewRecorder()
 
-	suite.mockStore.On("Get", req, cookieName).Return((*sessions.Session)(nil), fmt.Errorf("invalid session"))
+	suite.mockStore.On("Get", req, suite.oidc.cookieName).Return((*sessions.Session)(nil), fmt.Errorf("invalid session"))
 
 	suite.oidc.ServeHTTP(rw, req)
 
@@ -516,11 +518,11 @@ func (suite *TraefikOidcTestSuite) TestServeHTTP_ExpiredToken() {
 	req := httptest.NewRequest("GET", "http://example.com", nil)
 	rw := httptest.NewRecorder()
 
-	session := sessions.NewSession(suite.mockStore, cookieName)
+	session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 	session.Values["authenticated"] = true
 	session.Values["id_token"] = "expired.eyJleHAiOjF9.signature" // expired token
 
-	suite.mockStore.On("Get", req, cookieName).Return(session, nil)
+	suite.mockStore.On("Get", req, suite.oidc.cookieName).Return(session, nil)
 	suite.mockStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	suite.oidc.ServeHTTP(rw, req)
@@ -532,10 +534,10 @@ func (suite *TraefikOidcTestSuite) TestHandleCallback_InvalidState() {
 	req := httptest.NewRequest("GET", "http://example.com"+suite.oidc.redirURLPath+"?code=test_code&state=invalid_state", nil)
 	rw := httptest.NewRecorder()
 
-	session := sessions.NewSession(suite.mockStore, cookieName)
+	session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 	session.Values["csrf"] = "valid_state"
 
-	suite.mockStore.On("Get", req, cookieName).Return(session, nil)
+	suite.mockStore.On("Get", req, suite.oidc.cookieName).Return(session, nil)
 
 	suite.oidc.ServeHTTP(rw, req)
 
@@ -547,10 +549,10 @@ func (suite *TraefikOidcTestSuite) TestHandleCallback_TokenExchangeError() {
 	req := httptest.NewRequest("GET", "http://example.com"+suite.oidc.redirURLPath+"?code=invalid_code&state=test_state", nil)
 	rw := httptest.NewRecorder()
 
-	session := sessions.NewSession(suite.mockStore, cookieName)
+	session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 	session.Values["csrf"] = "test_state"
 
-	suite.mockStore.On("Get", req, cookieName).Return(session, nil)
+	suite.mockStore.On("Get", req, suite.oidc.cookieName).Return(session, nil)
 	suite.mockStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	suite.mockHTTPClient.On("RoundTrip", mock.Anything).Return(&http.Response{
@@ -709,10 +711,10 @@ func (suite *TraefikOidcTestSuite) TestHandleLogout_CustomLogoutURL() {
 	req := httptest.NewRequest("GET", "http://example.com/custom-logout", nil)
 	rw := httptest.NewRecorder()
 
-	session := sessions.NewSession(suite.mockStore, cookieName)
+	session := sessions.NewSession(suite.mockStore, suite.oidc.cookieName)
 	session.Values["id_token"] = "test_token"
 
-	suite.mockStore.On("Get", req, cookieName).Return(session, nil)
+	suite.mockStore.On("Get", req, suite.oidc.cookieName).Return(session, nil)
 	suite.mockStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	suite.oidc.ServeHTTP(rw, req)

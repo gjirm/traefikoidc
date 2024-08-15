@@ -8,9 +8,9 @@ import (
 	"os"
 )
 
-const (
-	cookieName = "_raczylo_oidc"
-)
+// const (
+// 	cookieName = "_raczylo_oidc"
+// )
 
 type Config struct {
 	ProviderURL          string   `json:"providerURL"`
@@ -23,6 +23,8 @@ type Config struct {
 	SessionEncryptionKey string   `json:"sessionEncryptionKey"`
 	ForceHTTPS           bool     `json:"forceHTTPS"`
 	RateLimit            int      `json:"rateLimit"`
+	SessionTimeout       int      `json:"sessionTimeout"`
+	CookieName           string   `json:"cookieName"`
 }
 
 func CreateConfig() *Config {
@@ -42,6 +44,14 @@ func CreateConfig() *Config {
 
 	if c.RateLimit == 0 {
 		c.RateLimit = 100
+	}
+
+	if c.SessionTimeout == 0 {
+		c.SessionTimeout = 86400
+	}
+
+	if c.CookieName == "" {
+		c.CookieName = "_raczylo_oidc"
 	}
 
 	return c

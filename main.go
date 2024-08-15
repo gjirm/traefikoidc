@@ -15,7 +15,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const ConstSessionTimeout = 86400
+//const ConstSessionTimeout = 86400
 
 type TokenVerifier interface {
 	VerifyToken(token string) error
@@ -49,6 +49,8 @@ type TraefikOidc struct {
 	redirectURL    string
 	tokenVerifier  TokenVerifier
 	jwtVerifier    JWTVerifier
+	sessionTimeout int
+	cookieName     string
 }
 
 type ProviderMetadata struct {
@@ -125,7 +127,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	store := sessions.NewCookieStore([]byte(config.SessionEncryptionKey))
 	store.Options = &sessions.Options{
 		Path:     "/",
-		MaxAge:   ConstSessionTimeout,
+		MaxAge:   config.SessionTimeout,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
@@ -179,6 +181,8 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		httpClient:     httpClient,
 		logger:         NewLogger(config.LogLevel),
 		redirectURL:    "",
+		sessionTimeout: config.SessionTimeout,
+		cookieName:     config.CookieName,
 	}
 
 	t.tokenVerifier = t
@@ -224,7 +228,7 @@ func (t *TraefikOidc) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		t.logger.Debugf("Redirect URL updated to: %s", t.redirectURL)
 	}
 
-	session, err := t.store.Get(req, cookieName)
+	session, err := t.store.Get(req, t.cookieName)
 	if err != nil {
 		t.logger.Errorf("Error getting session: %v", err)
 		http.Error(rw, "Session error", http.StatusInternalServerError)
@@ -398,7 +402,7 @@ func (t *TraefikOidc) RevokeToken(token string) {
 }
 
 func (t *TraefikOidc) refreshSession(w http.ResponseWriter, r *http.Request) {
-	session, err := t.store.Get(r, cookieName)
+	session, err := t.store.Get(r, t.cookieName)
 	if err != nil {
 		t.logger.Errorf("Error getting session: %v", err)
 		return
@@ -406,7 +410,7 @@ func (t *TraefikOidc) refreshSession(w http.ResponseWriter, r *http.Request) {
 
 	if auth, ok := session.Values["authenticated"].(bool); ok && auth {
 		// Refresh the session
-		session.Options.MaxAge = ConstSessionTimeout
+		session.Options.MaxAge = t.sessionTimeout
 		err = session.Save(r, w)
 		if err != nil {
 			t.logger.Errorf("Error saving session: %v", err)
