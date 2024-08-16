@@ -1,7 +1,7 @@
 displayName: Traefik OIDC
 type: middleware
 
-import: github.com/lukaszraczylo/traefikoidc
+import: github.com/gjirm/traefikoidc
 
 summary: |
   Middleware adding OIDC authentication to traefik routes.
